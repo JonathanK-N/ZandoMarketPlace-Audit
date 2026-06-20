@@ -4,7 +4,7 @@
   "private": true,
   "description": "Rapport d'audit technique ZandoMarketPlace - Cognito Inc.",
   "scripts": {
-    "start": "serve -s . -l $PORT"
+    "start": "serve . -l $PORT"
   },
   "dependencies": {
     "serve": "^14.2.1"
