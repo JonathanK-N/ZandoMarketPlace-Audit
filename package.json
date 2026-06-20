@@ -1,0 +1,12 @@
+{
+  "name": "zandomarketplace-audit-report",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rapport d'audit technique ZandoMarketPlace - Cognito Inc.",
+  "scripts": {
+    "start": "serve -s . -l $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+}
