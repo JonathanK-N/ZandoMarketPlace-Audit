@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZandoMarketPlace — Audit Technique Complet</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
+<style>
+:root{
+  --bg:#06060f; --bg2:#0c0e1f; --card:#11132a; --border:rgba(255,255,255,0.08);
+  --txt:#e8e9f7; --muted:#8d92bd;
+  --pink:#f72585; --cyan:#4cc9f0; --green:#4ade80; --amber:#fbbf24; --purple:#7b5cff;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0; background:var(--bg); color:var(--txt);
+  font-family:'Segoe UI',Roboto,Arial,sans-serif; line-height:1.6;
+  overflow-x:hidden;
+}
+a{color:var(--cyan); text-decoration:none;}
+h1,h2,h3,h4{font-family:'Segoe UI',Arial,sans-serif; margin:0 0 12px;}
+code, pre{font-family:'Fira Code',Consolas,monospace;}
+section{padding:90px 6vw; position:relative;}
+.container{max-width:1180px; margin:0 auto;}
+
+/* ===== BACKGROUND FX ===== */
+#bg-canvas{position:fixed; inset:0; z-index:-1; opacity:0.55;}
+.glow{position:absolute; border-radius:50%; filter:blur(90px); opacity:0.35; z-index:-1;}
+
+/* ===== NAV ===== */
+nav{
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 5vw; background:rgba(6,6,15,0.75); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+nav .brand{font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;}
+nav .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--pink); box-shadow:0 0 10px var(--pink); animation:pulse 2s infinite;}
+nav ul{display:flex; gap:22px; list-style:none; margin:0; padding:0; font-size:12.5px;}
+nav ul li a{color:var(--muted); transition:color .25s; position:relative; padding-bottom:4px;}
+nav ul li a.active, nav ul li a:hover{color:var(--txt);}
+nav ul li a.active::after{content:'';position:absolute; left:0; bottom:-2px; width:100%; height:2px; background:linear-gradient(90deg,var(--pink),var(--cyan)); border-radius:2px;}
+#nav-toggle{display:none;}
+
+@keyframes pulse{0%,100%{transform:scale(1); opacity:1;}50%{transform:scale(1.6); opacity:.5;}}
+
+/* ===== HERO ===== */
+#hero{
+  min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+  padding-top:80px;
+}
+#hero .badge{
+  font-size:12px; padding:6px 16px; border-radius:999px; border:1px solid var(--border);
+  background:rgba(255,255,255,0.04); color:var(--muted); margin-bottom:24px;
+  animation:fadeInUp .8s ease both;
+}
+#hero h1{
+  font-size:clamp(34px,6vw,72px); margin:0; letter-spacing:-1px;
+  background:linear-gradient(90deg,var(--pink),var(--cyan),var(--amber),var(--pink));
+  background-size:300% auto; -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:shimmer 8s linear infinite, fadeInUp 1s ease both;
+}
+@keyframes shimmer{to{background-position:300% center;}}
+#hero .sub{
+  font-size:clamp(15px,2vw,20px); color:var(--muted); margin-top:18px; max-width:680px;
+  animation:fadeInUp 1.2s ease both;
+}
+#hero .typed{color:var(--cyan); font-family:'Fira Code',monospace; font-size:15px; margin-top:26px; min-height:24px;}
+#hero .stats{display:flex; gap:50px; margin-top:60px; flex-wrap:wrap; justify-content:center; animation:fadeInUp 1.4s ease both;}
+#hero .stat{text-align:center;}
+#hero .stat .num{font-size:38px; font-weight:800; color:var(--txt);}
+#hero .stat .label{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;}
+#hero .scrolldown{margin-top:70px; color:var(--muted); font-size:12px; animation:bounce 2s infinite;}
+@keyframes bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(10px);}}
+@keyframes fadeInUp{from{opacity:0; transform:translateY(24px);}to{opacity:1; transform:translateY(0);}}
+
+/* ===== REVEAL ON SCROLL ===== */
+.reveal{opacity:0; transform:translateY(34px); transition:opacity .7s ease, transform .7s ease;}
+.reveal.visible{opacity:1; transform:translateY(0);}
+.reveal-stagger > *{opacity:0; transform:translateY(24px); transition:opacity .6s ease, transform .6s ease;}
+.reveal-stagger.visible > *{opacity:1; transform:translateY(0);}
+
+/* ===== SECTION TITLES ===== */
+.eyebrow{font-size:12px; letter-spacing:3px; text-transform:uppercase; color:var(--pink); font-weight:700; margin-bottom:10px;}
+.sec-title{font-size:clamp(26px,4vw,42px); margin-bottom:14px;}
+.sec-desc{color:var(--muted); max-width:720px; margin-bottom:48px; font-size:15.5px;}
+
+/* ===== ARCHITECTURE DIAGRAM ===== */
+#architecture{background:linear-gradient(180deg,var(--bg) 0%, var(--bg2) 100%);}
+.arch-wrap{position:relative; padding:40px 0;}
+.arch-svg{width:100%; height:auto;}
+.arch-path{fill:none; stroke-width:2; stroke-dasharray:8 6; opacity:0.55;}
+.arch-node{
+  fill:var(--card); stroke-width:1.5;
+}
+.arch-label{fill:var(--txt); font-size:13px; font-weight:700; font-family:'Segoe UI',sans-serif;}
+.arch-sub{fill:var(--muted); font-size:10.5px; font-family:'Segoe UI',sans-serif;}
+
+.app-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; margin-top:50px;}
+.app-card{
+  background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px;
+  transition:transform .3s, box-shadow .3s;
+}
+.app-card:hover{transform:translateY(-6px); box-shadow:0 14px 40px rgba(0,0,0,.4);}
+.app-card .icon{font-size:26px; margin-bottom:10px;}
+.app-card h4{font-size:15px;}
+.app-card p{color:var(--muted); font-size:12.5px; margin:4px 0 0;}
+.app-card .meter{height:5px; border-radius:3px; background:rgba(255,255,255,.08); margin-top:14px; overflow:hidden;}
+.app-card .meter span{display:block; height:100%; border-radius:3px; width:0; transition:width 1.4s ease;}
+
+/* ===== DB SECTION ===== */
+#database .frame{
+  border-radius:18px; overflow:hidden; border:1px solid var(--border);
+  box-shadow:0 30px 80px rgba(0,0,0,.5); position:relative; height:640px;
+}
+#database iframe{width:100%; height:100%; border:0; display:block; background:#05050c;}
+.frame-note{display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12.5px; margin-top:14px;}
+.mcd-card{
+  background:#ffffff; border-radius:18px; overflow:hidden; padding:24px;
+  border:1px solid var(--border); box-shadow:0 30px 80px rgba(0,0,0,.5);
+}
+.db-tab-panel{display:none;}
+.db-tab-panel.active{display:block; animation:fadeInUp .5s ease both;}
+
+/* ===== FINDING CARDS ===== */
+.finding{
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:24px 26px; margin-bottom:18px; position:relative; overflow:hidden;
+}
+.finding::before{content:''; position:absolute; left:0; top:0; bottom:0; width:4px;}
+.finding.crit::before{background:var(--pink); box-shadow:0 0 16px var(--pink); animation:pulse-bar 1.6s infinite;}
+.finding.maj::before{background:var(--amber);}
+.finding.min::before{background:var(--cyan);}
+@keyframes pulse-bar{0%,100%{opacity:1;}50%{opacity:.4;}}
+.finding-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px;}
+.finding-id{font-family:'Fira Code',monospace; font-size:12px; color:var(--muted);}
+.sev-tag{font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; text-transform:uppercase; letter-spacing:.5px;}
+.sev-tag.crit{background:rgba(247,37,133,0.15); color:var(--pink); border:1px solid rgba(247,37,133,0.4);}
+.sev-tag.maj{background:rgba(251,191,36,0.15); color:var(--amber); border:1px solid rgba(251,191,36,0.4);}
+.sev-tag.min{background:rgba(76,201,240,0.15); color:var(--cyan); border:1px solid rgba(76,201,240,0.4);}
+.finding h4{font-size:16px; margin:0 0 6px;}
+.finding .loc{font-family:'Fira Code',monospace; font-size:12px; color:var(--muted); margin-bottom:12px;}
+.finding p{color:#c7c9e6; font-size:14px; margin:0 0 10px;}
+.finding pre{
+  background:#0a0b18; border:1px solid var(--border); border-radius:10px; padding:14px 16px;
+  font-size:12.5px; overflow-x:auto; margin:10px 0;
+}
+.finding .impact{
+  font-size:12.5px; color:var(--muted); border-top:1px dashed var(--border); padding-top:10px; margin-top:10px;
+}
+.finding .impact b{color:var(--txt);}
+
+/* ===== TABS ===== */
+.tabs{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:36px;}
+.tab-btn{
+  background:var(--card); border:1px solid var(--border); color:var(--muted);
+  padding:10px 18px; border-radius:999px; font-size:13px; cursor:pointer; transition:.25s;
+}
+.tab-btn.active{color:#fff; border-color:transparent; background:linear-gradient(90deg,var(--pink),var(--purple));}
+.tab-panel{display:none;}
+.tab-panel.active{display:block; animation:fadeInUp .5s ease both;}
+
+/* ===== COMPARISON TABLE ===== */
+.compare{width:100%; border-collapse:collapse; margin-top:10px;}
+.compare th, .compare td{padding:14px 16px; border-bottom:1px solid var(--border); font-size:13.5px; text-align:left; vertical-align:top;}
+.compare th{color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:1px;}
+.compare .before{color:#ff9aa8;}
+.compare .after{color:#9af0c4;}
+
+/* ===== SCORE BARS ===== */
+.score-row{display:flex; align-items:center; gap:18px; margin-bottom:22px;}
+.score-row .name{width:230px; font-size:13.5px; color:var(--muted); flex-shrink:0;}
+.score-bar{flex:1; height:10px; border-radius:6px; background:rgba(255,255,255,.06); overflow:hidden; position:relative;}
+.score-bar .fill{position:absolute; left:0; top:0; height:100%; border-radius:6px; width:0; transition:width 1.6s cubic-bezier(.2,.8,.2,1);}
+.score-row .val{width:90px; text-align:right; font-weight:700; font-size:13px;}
+
+/* ===== ROADMAP ===== */
+.roadmap{position:relative; margin-top:40px; padding-left:30px; border-left:2px solid var(--border);}
+.rm-item{position:relative; margin-bottom:30px; padding-left:24px;}
+.rm-item::before{
+  content:''; position:absolute; left:-39px; top:2px; width:14px; height:14px; border-radius:50%;
+  background:var(--bg2); border:2px solid var(--cyan);
+}
+.rm-item.done::before{background:var(--green); border-color:var(--green); box-shadow:0 0 10px var(--green);}
+.rm-item h4{font-size:15px; margin-bottom:4px;}
+.rm-item p{color:var(--muted); font-size:13px; margin:0;}
+.rm-tag{font-size:10.5px; padding:2px 8px; border-radius:6px; background:rgba(255,255,255,.08); margin-left:8px;}
+
+/* ===== VERDICT ===== */
+#verdict{text-align:center; background:radial-gradient(circle at 50% 0%, rgba(247,37,133,0.12), transparent 60%);}
+#verdict blockquote{
+  font-size:clamp(17px,2.2vw,22px); max-width:760px; margin:0 auto 40px; color:#dadcf5; font-style:italic;
+}
+.signature{margin-top:50px;}
+.signature .name{font-size:20px; font-weight:800;}
+.signature .role{color:var(--muted); font-size:13px; margin-top:4px;}
+
+footer{text-align:center; padding:40px; color:var(--muted); font-size:12px; border-top:1px solid var(--border);}
+
+.print-only{display:none;}
+@media print{
+  nav, .scrolldown, #bg-canvas, .glow{display:none !important;}
+  body{background:#fff; color:#111;}
+  section{padding:20px 0; page-break-inside:avoid;}
+  .finding, .app-card{background:#f7f7fb; border:1px solid #ddd;}
+  .reveal, .reveal-stagger > *{opacity:1 !important; transform:none !important;}
+  .tab-panel, .db-tab-panel{display:block !important;}
+  .frame{display:none !important;}
+  .print-only{display:block !important; background:#f7f7fb; border:1px dashed #999; border-radius:10px; padding:30px; text-align:center; color:#444;}
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="glow" style="width:600px;height:600px;background:#f72585;top:-200px;left:-200px;"></div>
+<div class="glow" style="width:500px;height:500px;background:#4cc9f0;top:40%;right:-150px;"></div>
+<div class="glow" style="width:500px;height:500px;background:#7b5cff;bottom:-200px;left:30%;"></div>
+
+<nav>
+  <div class="brand"><span class="dot"></span> ZandoMarketPlace · Audit Cognito Inc.</div>
+  <ul id="nav-links">
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#database">Base de données</a></li>
+    <li><a href="#audit">Audit complet</a></li>
+    <li><a href="#scores">Scores</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#verdict">Verdict</a></li>
+  </ul>
+</nav>
+
+<!-- ===================== HERO ===================== -->
+<section id="hero">
+  <div class="badge">🔬 Rapport d'audit technique indépendant · 19 juin 2026</div>
+  <h1>ZandoMarketPlace</h1>
+  <div class="sub">Architecture du code, schéma de base de données en 3D, et audit technique complet — avant et après l'intervention de Cognito Inc.</div>
+  <div class="typed" id="typed"></div>
+  <div class="stats">
+    <div class="stat"><div class="num" data-count="23">0</div><div class="label">Tables</div></div>
+    <div class="stat"><div class="num" data-count="27">0</div><div class="label">Relations</div></div>
+    <div class="stat"><div class="num" data-count="29">0</div><div class="label">Failles relevées</div></div>
+    <div class="stat"><div class="num" data-count="5">0</div><div class="label">Apps Django</div></div>
+  </div>
+  <div class="scrolldown">⌄ défiler pour explorer ⌄</div>
+</section>
+
+<!-- ===================== ARCHITECTURE ===================== -->
+<section id="architecture">
+  <div class="container">
+    <div class="reveal">
+      <div class="eyebrow">01 · Structure du code</div>
+      <h2 class="sec-title">🏗️ Architecture des applications Django</h2>
+      <p class="sec-desc">ZandoMarketPlace est découpé en 5 apps Django. Les flèches montrent les dépendances réelles trouvées dans le code (imports, ForeignKey). Plus une app a de connexions entrantes, plus elle est centrale dans le système.</p>
+    </div>
+
+    <div class="arch-wrap reveal">
+      <svg class="arch-svg" viewBox="0 0 1000 460" id="arch-svg">
+        <!-- liens -->
+        <path id="p1" class="arch-path" stroke="#4cc9f0" d="M500,230 C420,150 320,100 220,90"></path>
+        <path id="p2" class="arch-path" stroke="#4ade80" d="M500,230 C420,280 320,330 220,360"></path>
+        <path id="p3" class="arch-path" stroke="#fbbf24" d="M500,230 C620,150 740,100 800,90"></path>
+        <path id="p4" class="arch-path" stroke="#4ade80" d="M220,360 C400,400 600,400 800,90"></path>
+        <path id="p5" class="arch-path" stroke="#94a3b8" d="M500,230 C500,330 500,380 500,420"></path>
+
+        <!-- accounts -->
+        <g>
+          <circle class="arch-node" cx="220" cy="90" r="58" stroke="#4cc9f0"></circle>
+          <text class="arch-label" x="220" y="84" text-anchor="middle">accounts</text>
+          <text class="arch-sub" x="220" y="102" text-anchor="middle">4 tables · User custom</text>
+        </g>
+        <!-- products (central) -->
+        <g>
+          <circle class="arch-node" cx="500" cy="230" r="78" stroke="#f72585"></circle>
+          <text class="arch-label" x="500" y="222" text-anchor="middle" style="font-size:15px">products</text>
+          <text class="arch-sub" x="500" y="242" text-anchor="middle">14 tables · cœur du système</text>
+        </g>
+        <!-- orders -->
+        <g>
+          <circle class="arch-node" cx="220" cy="360" r="58" stroke="#4ade80"></circle>
+          <text class="arch-label" x="220" y="354" text-anchor="middle">orders</text>
+          <text class="arch-sub" x="220" y="372" text-anchor="middle">4 tables · panier/commande</text>
+        </g>
+        <!-- payments -->
+        <g>
+          <circle class="arch-node" cx="800" cy="90" r="58" stroke="#fbbf24"></circle>
+          <text class="arch-label" x="800" y="84" text-anchor="middle">payments</text>
+          <text class="arch-sub" x="800" y="102" text-anchor="middle">1 table · 0% intégré</text>
+        </g>
+        <!-- dashboard -->
+        <g>
+          <circle class="arch-node" cx="500" cy="420" r="48" stroke="#94a3b8" stroke-dasharray="4 4"></circle>
+          <text class="arch-label" x="500" y="416" text-anchor="middle" style="font-size:12px">dashboard</text>
+          <text class="arch-sub" x="500" y="432" text-anchor="middle">0 table · vide</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="app-grid reveal-stagger" id="app-cards">
+      <div class="app-card">
+        <div class="icon">👤</div><h4>accounts</h4>
+        <p>Utilisateur custom (client/seller/admin) + 3 profils spécialisés. Modèles complets, <b>0 vue active</b>.</p>
+        <div class="meter"><span style="background:#4cc9f0" data-w="25"></span></div>
+      </div>
+      <div class="app-card">
+        <div class="icon">🛍️</div><h4>products</h4>
+        <p>Catalogue, variantes, rabais, avis, wishlist. App la plus aboutie : vues, templates, admin riche.</p>
+        <div class="meter"><span style="background:#f72585" data-w="70"></span></div>
+      </div>
+      <div class="app-card">
+        <div class="icon">🛒</div><h4>orders</h4>
+        <p>Panier et commande modélisés en base, <b>aucune vue, aucune route active</b>.</p>
+        <div class="meter"><span style="background:#4ade80" data-w="15"></span></div>
+      </div>
+      <div class="app-card">
+        <div class="icon">💳</div><h4>payments</h4>
+        <p>Modèle <code>Payment</code> seul. Stripe en dépendance, <b>0 ligne d'intégration</b>.</p>
+        <div class="meter"><span style="background:#fbbf24" data-w="5"></span></div>
+      </div>
+      <div class="app-card">
+        <div class="icon">📊</div><h4>dashboard</h4>
+        <p>Censée gérer l'administration globale. <b>Entièrement vide</b> — code généré par défaut uniquement.</p>
+        <div class="meter"><span style="background:#94a3b8" data-w="0"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DATABASE ===================== -->
+<section id="database">
+  <div class="container">
+    <div class="reveal">
+      <div class="eyebrow">02 · Base de données</div>
+      <h2 class="sec-title">🧬 Schéma relationnel — 3D animé &amp; MCD formel</h2>
+      <p class="sec-desc">Deux lectures complémentaires du même schéma réel : une vue 3D immersive pour explorer, et un Modèle Conceptuel de Données classique (notation Mocodo) pour les cardinalités précises.</p>
+    </div>
+
+    <div class="tabs reveal" id="db-tabs">
+      <button class="tab-btn active" data-dbtab="d3">🌌 Vue 3D animée</button>
+      <button class="tab-btn" data-dbtab="mcd">📐 MCD — notation Mocodo</button>
+    </div>
+
+    <div class="db-tab-panel active" id="dbtab-d3">
+      <div class="frame reveal">
+        <iframe src="schema-3d.html" loading="lazy"></iframe>
+      </div>
+      <div class="print-only">🧬 Visualisation 3D interactive disponible dans la version web (fichier <code>schema-3d.html</code>) — non reproductible sur papier/PDF.</div>
+      <div class="frame-note">🖱️ Interactif en direct ci-dessus — fonctionne aussi en plein écran via <a href="schema-3d.html" target="_blank">schema-3d.html</a></div>
+    </div>
+
+    <div class="db-tab-panel" id="dbtab-mcd">
+      <div class="mcd-card reveal">
+        <img src="mcd/zandomarketplace.svg" alt="MCD ZandoMarketPlace - notation Mocodo" style="width:100%;display:block;">
+      </div>
+      <div class="frame-note">📂 Source éditable : <code>docs/mcd/zandomarketplace.mcd</code> — régénérable avec <code>python -m mocodo --input zandomarketplace.mcd</code>. Notation classique : entités à gauche (attribut souligné = identifiant), associations en losange, cardinalités (0,1 / 1,1 / 0,N / 1,N) sur chaque branche.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== AUDIT ===================== -->
+<section id="audit">
+  <div class="container">
+    <div class="reveal">
+      <div class="eyebrow">03 · Audit technique approfondi</div>
+      <h2 class="sec-title">🔍 Toutes les failles, classées par domaine</h2>
+      <p class="sec-desc">Revue exhaustive ligne par ligne du code reçu, complétée par des tests fonctionnels réels sur le déploiement Railway. Chaque finding indique le fichier, la ligne, le code fautif et l'impact concret.</p>
+    </div>
+
+    <div class="tabs reveal" id="tabs">
+      <button class="tab-btn active" data-tab="secu">🔐 Sécurité</button>
+      <button class="tab-btn" data-tab="perf">⚡ Performance &amp; SQL</button>
+      <button class="tab-btn" data-tab="back">🧩 Backend</button>
+      <button class="tab-btn" data-tab="front">🎨 Frontend</button>
+      <button class="tab-btn" data-tab="qual">🧪 Qualité &amp; Tests</button>
+      <button class="tab-btn" data-tab="post">🚀 Post-déploiement</button>
+    </div>
+
+    <!-- SECURITY -->
+    <div class="tab-panel active" id="tab-secu">
+      <div class="finding crit reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-001</span><span class="sev-tag crit">Critique</span></div>
+        <h4>Aucun dépôt Git — projet jamais versionné</h4>
+        <div class="loc">Racine du projet</div>
+        <p>Le code n'existait sous aucune forme de contrôle de version. Zéro historique, zéro sauvegarde, zéro rollback possible en cas d'erreur humaine.</p>
+        <div class="impact"><b>Impact :</b> perte totale du travail possible en un clic (suppression accidentelle, crash disque).</div>
+      </div>
+
+      <div class="finding crit reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-002</span><span class="sev-tag crit">Critique</span></div>
+        <h4>Secrets en clair, sans protection</h4>
+        <div class="loc">.env</div>
+        <pre><code class="language-bash">SECRET_KEY=django-insecure-7$y9x!kq8p@r#9*abc1234567890abcdef
+DEBUG=True</code></pre>
+        <p>La clé qui signe les cookies de session et les tokens CSRF était stockée en clair, sans <code>.gitignore</code> pour empêcher un commit accidentel. <code>DEBUG=True</code> expose les stack traces complètes (chemins serveur, requêtes SQL) à tout visiteur en cas d'erreur.</p>
+        <div class="impact"><b>Impact :</b> usurpation de session, falsification CSRF, fuite d'informations serveur.</div>
+      </div>
+
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-004</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>ALLOWED_HOSTS ouvert à tous</h4>
+        <div class="loc">zandomarket/settings.py</div>
+        <pre><code class="language-python">ALLOWED_HOSTS = ['*']</code></pre>
+        <p>Accepte n'importe quel en-tête <code>Host</code> — vecteur classique d'attaque par <i>Host Header Injection</i> (empoisonnement de cache, liens de réinitialisation de mot de passe forgés).</p>
+      </div>
+
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-005</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>CORS configuré... mais jamais actif</h4>
+        <div class="loc">settings.py — INSTALLED_APPS vs MIDDLEWARE</div>
+        <pre><code class="language-python">INSTALLED_APPS = [..., 'corsheaders', ...]  # présent
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    # 'corsheaders.middleware.CorsMiddleware',  ← JAMAIS AJOUTÉ
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    ...
+]</code></pre>
+        <p><code>corsheaders</code> est listé comme app installée, donnant l'illusion d'une protection CORS. Le middleware réel n'a jamais été branché : la protection n'a <b>jamais été active</b>, à aucun moment de la vie du projet.</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-017</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Ressource CDN sans Subresource Integrity</h4>
+        <div class="loc">base.html — ligne 15</div>
+        <pre><code class="language-html">&lt;link href="https://cdnjs.cloudflare.com/.../font-awesome/6.4.2/css/all.min.css" rel="stylesheet"&gt;
+&lt;!-- pas d'attribut integrity ni crossorigin --&gt;</code></pre>
+        <p>Si ce CDN est un jour compromis, du CSS/JS arbitraire pourrait être injecté sans aucune alerte du navigateur.</p>
+      </div>
+    </div>
+
+    <!-- PERFORMANCE -->
+    <div class="tab-panel" id="tab-perf">
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-024</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>order_by('?') — tri aléatoire au niveau SQL sur chaque vue de la page d'accueil</h4>
+        <div class="loc">apps/products/views.py — ligne 28</div>
+        <pre><code class="language-python">recommended_products = Product.objects.filter(
+    is_active=True, is_approved=True
+).order_by('?')[:12]   # ⚠️ ORDER BY RANDOM() en PostgreSQL</code></pre>
+        <p>Sous PostgreSQL/MySQL, <code>order_by('?')</code> force la base à <b>trier la table entière en mémoire avec une valeur aléatoire par ligne</b> avant de garder 12 résultats. Sur une table de quelques milliers de produits, c'est déjà coûteux ; sur une table de plusieurs centaines de milliers de lignes, c'est une requête qui peut prendre plusieurs secondes — exécutée à <b>chaque chargement de la page d'accueil, par chaque visiteur</b>.</p>
+        <div class="impact"><b>Impact :</b> la page d'accueil devient de plus en plus lente à mesure que le catalogue grossit — la pire des relations entre "succès commercial" et "performance".</div>
+      </div>
+
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-010</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>Problème N+1 — jusqu'à 40 requêtes SQL juste pour afficher des étoiles</h4>
+        <div class="loc">apps/products/models.py — Product.average_rating / rating_count</div>
+        <pre><code class="language-python">@property
+def average_rating(self):
+    return self.reviews.aggregate(avg=models.Avg('rating'))['avg'] or 0  # 1 requête
+
+@property
+def rating_count(self):
+    return self.reviews.count()                                          # 1 requête</code></pre>
+        <p>Appelées dans le template pour chacun des 12 + 8 = 20 produits affichés en page d'accueil. <code>.aggregate()</code> et <code>.count()</code> <b>ignorent totalement le cache de <code>prefetch_related()</code></b> et retournent systématiquement en base — même là où le prefetch est pourtant déjà présent dans la vue.</p>
+        <div class="impact"><b>Impact mesuré :</b> jusqu'à 40 requêtes SQL additionnelles par chargement de la page d'accueil, uniquement pour le rendu des étoiles.</div>
+      </div>
+
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-025</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>N+1 sur les publicités sponsorisées</h4>
+        <div class="loc">views.py ligne 21 + home.html ligne 93</div>
+        <pre><code class="language-python"># views.py — pas de select_related('product')
+ads = Ad.objects.filter(is_active=True).order_by('-priority')[:10]</code></pre>
+        <pre><code class="language-html">&lt;!-- home.html — déclenche 1 requête PAR publicité --&gt;
+{{ ad.product.final_price }} {{ ad.product.currency }}</code></pre>
+        <p>Sans <code>select_related('product')</code>, chaque accès à <code>ad.product</code> dans la boucle déclenche sa propre requête — jusqu'à 10 requêtes supplémentaires pour la seule section "Offres sponsorisées".</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-026</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Pas de pooling de connexions DB</h4>
+        <div class="loc">settings.py — DATABASES</div>
+        <p><code>CONN_MAX_AGE</code> n'est jamais défini : Django ouvre et ferme une nouvelle connexion PostgreSQL à <b>chaque requête HTTP</b> au lieu de la réutiliser. Coût négligeable à faible trafic, mais devient un goulot d'étranglement réel dès que le nombre de visiteurs simultanés augmente sur Railway.</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-027</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Aucun index sur les champs filtrés en permanence</h4>
+        <div class="loc">apps/products/models.py</div>
+        <pre><code class="language-python">is_active = models.BooleanField(default=True)     # filtré dans CHAQUE requête produit
+is_approved = models.BooleanField(default=False)  # filtré dans CHAQUE requête produit
+is_daily = models.BooleanField(default=False)     # filtré sur la page d'accueil</code></pre>
+        <p>Aucun de ces champs n'a <code>db_index=True</code>, malgré un usage systématique dans les <code>.filter()</code> de la page la plus visitée du site. Sans index, PostgreSQL doit parcourir séquentiellement la table entière à chaque appel.</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-028</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Aucune pagination — plafond de scalabilité programmé</h4>
+        <div class="loc">apps/products/views.py::home()</div>
+        <p>Les requêtes sont limitées par des <code>slice</code> codés en dur (<code>[:12]</code>, <code>[:8]</code>). Il n'existe aucune page de catégorie, aucune pagination, aucun "voir plus" fonctionnel : au-delà de la page d'accueil, le catalogue est tout simplement inaccessible, quelle que soit sa taille.</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-029</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Historique de vues sans limite ni déduplication</h4>
+        <div class="loc">apps/products/views.py::product_detail() — ligne 79</div>
+        <pre><code class="language-python">if request.user.is_authenticated:
+    ProductView.objects.create(user=request.user, product=product)
+    # une ligne créée à CHAQUE requête, même un simple refresh (F5)</code></pre>
+        <p>Aucune contrainte d'unicité, aucun throttling. Un utilisateur qui rafraîchit frénétiquement une fiche produit (ou un script automatisé) peut générer un nombre illimité de lignes — vecteur de saturation de table.</p>
+      </div>
+    </div>
+
+    <!-- BACKEND -->
+    <div class="tab-panel" id="tab-back">
+      <div class="finding crit reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-006</span><span class="sev-tag crit">Critique</span></div>
+        <h4>Authentification : liens visibles, routes inexistantes → 404 garantie</h4>
+        <div class="loc">apps/accounts/urls.py (vide) vs includes/header.html</div>
+        <pre><code class="language-python"># apps/accounts/urls.py — contenu INTÉGRAL
+urlpatterns = [
+    # exemple temporaire
+    # path('', views.product_list, name='product_list'),
+]</code></pre>
+        <pre><code class="language-html">&lt;a href="/login/"&gt;Se connecter&lt;/a&gt;
+&lt;a href="/register/"&gt;S'inscrire&lt;/a&gt;
+&lt;a href="/logout/"&gt;Déconnexion&lt;/a&gt;</code></pre>
+        <p><b>Vérifié en direct sur le site déployé : ces trois liens renvoient une erreur 404.</b> Aucun visiteur ne peut créer de compte, se connecter, ou se déconnecter.</p>
+      </div>
+
+      <div class="finding crit reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-007</span><span class="sev-tag crit">Critique</span></div>
+        <h4>Panier &amp; commande — modélisés, jamais branchés</h4>
+        <div class="loc">apps/orders/views.py (3 lignes) + urls.py (routes commentées)</div>
+        <p>34 lignes de modèles bien pensés (<code>Cart</code>, <code>CartItem</code>, <code>Order</code>, <code>OrderItem</code>) — et zéro vue, zéro formulaire, zéro route pour les exploiter. Le bouton "Panier" du header pointe vers <code>href="#"</code>.</p>
+      </div>
+
+      <div class="finding crit reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-008</span><span class="sev-tag crit">Critique</span></div>
+        <h4>Paiement : une dépendance, zéro implémentation</h4>
+        <div class="loc">requirements.txt vs apps/payments/</div>
+        <p><code>stripe</code> figure dans les dépendances, donnant l'illusion qu'un système de paiement existe. En réalité <code>views.py</code> est vide et le modèle <code>Payment</code> ne contient aucune logique d'appel API. <b>Taux d'implémentation réel : 0%.</b></p>
+      </div>
+
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-009</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>Code dupliqué dans product_detail()</h4>
+        <div class="loc">apps/products/views.py — lignes 88 à 113</div>
+        <pre><code class="language-python">variants = product.variants.select_related("color", "size")     # ligne 88 — calculé...
+reviews  = product.reviews.select_related("user")                 # ligne 93 — ...puis jeté
+total_views = product.views.count()                               # ligne 97
+
+variants = ProductVariant.objects.filter(product=product)...      # ligne 102 — RECALCULÉ
+reviews  = ProductReview.objects.filter(product=product)...       # ligne 109 — RECALCULÉ
+total_views = product.views.count()                                # ligne 123 — RE-RECALCULÉ</code></pre>
+        <p>Trois requêtes SQL exécutées deux fois chacune, pour rien, à chaque ouverture d'une fiche produit.</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-011</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Rabais sans plafond → prix final négatif possible</h4>
+        <div class="loc">apps/products/models.py — lignes 78, 148</div>
+        <pre><code class="language-python">discount_percent = models.PositiveIntegerField(default=0)  # pas de MaxValueValidator !</code></pre>
+        <p><code>MaxValueValidator</code> est pourtant déjà importé en haut du fichier (utilisé sur <code>rating</code>) mais jamais appliqué ici. Un rabais de 150% produit un <code>final_price</code> négatif.</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-012</span><span class="sev-tag min">Mineur</span></div>
+        <h4>user_type ≠ permissions réelles</h4>
+        <div class="loc">apps/accounts/models.py</div>
+        <pre><code class="language-python">@property
+def is_admin_user(self):
+    return self.user_type == 'admin' or self.is_superuser</code></pre>
+        <p><code>user_type</code> (texte modifiable) et <code>is_staff</code>/<code>is_superuser</code> (vraies permissions Django) ne sont jamais synchronisés — confusion garantie entre "rôle affiché" et "droits réels".</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-013</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Vérification vendeur jamais appliquée</h4>
+        <div class="loc">apps/products/models.py — SellerProfile.is_verified</div>
+        <p>Le champ existe en base mais n'est vérifié nulle part dans le code : un vendeur non vérifié a exactement les mêmes droits qu'un vendeur vérifié.</p>
+      </div>
+    </div>
+
+    <!-- FRONTEND -->
+    <div class="tab-panel" id="tab-front">
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-014</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>HTML invalide — balises &lt;a&gt; jamais fermées dans la boucle</h4>
+        <div class="loc">home.html — lignes 123-191 et 214-281 (dupliqué)</div>
+        <pre><code class="language-html">{% for product in recommended_products %}
+  &lt;a href="..." class="product-card-link"&gt;      &lt;!-- ouverte N fois --&gt;
+    &lt;div class="product-card"&gt; ... &lt;/div&gt;
+{% endfor %}
+&lt;/div&gt;                                            &lt;!-- div surnuméraire --&gt;
+&lt;/a&gt;                                               &lt;!-- une seule fermeture pour N ouvertures ! --&gt;</code></pre>
+        <p>Les navigateurs "réparent" silencieusement ce genre d'erreur, mais le comportement de clic devient imprévisible (liens imbriqués, zones cliquables qui se chevauchent). Ce code ne passerait aucun validateur HTML.</p>
+      </div>
+
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-015</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>Navigation entièrement factice</h4>
+        <div class="loc">header.js — categoryData / header.html — category-bar</div>
+        <pre><code class="language-javascript">more.addEventListener("click", ()=>{
+  alert("Catalogue bientôt disponible 🚀");
+});</code></pre>
+        <p>Le menu de catégories visible à l'écran est codé en dur en JavaScript, totalement déconnecté du modèle <code>Category</code> réel. La barre de recherche n'a ni <code>&lt;form&gt;</code>, ni <code>action</code>, ni gestionnaire — purement décorative.</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-016</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Assets chargés en double</h4>
+        <div class="loc">base.html lignes 18, 42 + home.html lignes 9, 291</div>
+        <p><code>home.css</code> et <code>home.js</code> sont chargés sans condition dans <code>base.html</code> (donc sur <b>toutes</b> les pages), puis rechargés une seconde fois dans <code>home.html</code>. <code>home.js</code> n'a en plus aucun attribut <code>defer</code>, contrairement à <code>header.js</code> juste en dessous — incohérence qui bloque inutilement le rendu pendant le téléchargement.</p>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-018</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Footer quasi vide</h4>
+        <div class="loc">includes/footer.html</div>
+        <p>Une seule ligne de copyright. Aucun lien "À propos", "Contact", CGV/CGU, politique de confidentialité — problématique pour la confiance client et la conformité légale d'un site marchand.</p>
+      </div>
+    </div>
+
+    <!-- QUALITY -->
+    <div class="tab-panel" id="tab-qual">
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-019</span><span class="sev-tag min">Mineur</span></div>
+        <h4>App "dashboard" totalement vide</h4>
+        <div class="loc">apps/dashboard/</div>
+        <p>Censée gérer l'administration globale du marketplace : ne contient que le code généré par défaut (<code>django-admin startapp</code>), zéro ligne ajoutée.</p>
+      </div>
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-020</span><span class="sev-tag min">Mineur</span></div>
+        <h4>0% de couverture de test, aucune CI/CD</h4>
+        <div class="loc">apps/*/tests.py</div>
+        <pre><code class="language-python"># Create your tests here.   ← contenu intégral des 5 fichiers tests.py</code></pre>
+        <p>Aucun linter, aucun formatage automatique, aucun pre-commit hook, aucune vérification avant mise en production.</p>
+      </div>
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-021</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Fichiers parasites &amp; incohérence de langue</h4>
+        <div class="loc">Racine du projet / settings.py</div>
+        <p>3 fichiers vides de 0 octet (<code>cls</code>, <code>python</code>, <code>{</code>) — artefacts d'une commande tapée dans le mauvais terminal. <code>LANGUAGE_CODE = 'en-us'</code> alors que toute l'interface visible est en français.</p>
+      </div>
+    </div>
+
+    <!-- POST-DEPLOY -->
+    <div class="tab-panel" id="tab-post">
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-008b</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>🐛 Bug Django classique — images invisibles en production</h4>
+        <div class="loc">zandomarket/urls.py (avant correction)</div>
+        <pre><code class="language-python">if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# django.conf.urls.static.static() est codé en dur pour renvoyer []
+# quand DEBUG=False, MÊME si on retire le "if" autour</code></pre>
+        <p>Découvert en testant le site réellement déployé : toutes les images (carrousel, pubs, produits) étaient invisibles en production. Corrigé avec un appel direct à <code>django.views.static.serve</code>.</p>
+        <div class="impact">✅ <b>Corrigé</b> par Cognito Inc. — voir <code>zandomarket/urls.py</code> actuel.</div>
+      </div>
+
+      <div class="finding maj reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-022</span><span class="sev-tag maj">Majeur</span></div>
+        <h4>Stockage media éphémère sur Railway</h4>
+        <div class="loc">Infrastructure Railway</div>
+        <p>Le disque de Railway est éphémère : toute photo uploadée via l'admin après la mise en ligne <b>sera supprimée au prochain déploiement</b>. Les images actuellement visibles sont celles commitées dans le dépôt Git, pas des uploads dynamiques.</p>
+        <div class="impact">❌ <b>Non corrigé</b> — nécessite une migration vers S3 / Cloudflare R2 avant toute mise en production commerciale.</div>
+      </div>
+
+      <div class="finding min reveal">
+        <div class="finding-head"><span class="finding-id">ZMP-2026-023</span><span class="sev-tag min">Mineur</span></div>
+        <h4>Mot de passe admin encore en variable d'environnement</h4>
+        <div class="loc">Variables Railway — DJANGO_SUPERUSER_PASSWORD</div>
+        <p>Solution temporaire mise en place en l'absence de CLI Railway sur la machine de développement, pour créer un compte administrateur en production. À retirer après la première connexion réussie.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SCORES ===================== -->
+<section id="scores">
+  <div class="container">
+    <div class="reveal">
+      <div class="eyebrow">04 · Tableau de bord</div>
+      <h2 class="sec-title">📊 Avant / après — scores par domaine</h2>
+    </div>
+    <div class="reveal" style="margin-top:30px;">
+      <div class="score-row"><div class="name">🔐 Sécurité</div><div class="score-bar"><div class="fill" data-w="80" style="background:linear-gradient(90deg,#f72585,#4cc9f0)"></div></div><div class="val">4→8/10</div></div>
+      <div class="score-row"><div class="name">🚀 Infrastructure</div><div class="score-bar"><div class="fill" data-w="80" style="background:linear-gradient(90deg,#4ade80,#4cc9f0)"></div></div><div class="val">0→8/10</div></div>
+      <div class="score-row"><div class="name">🧩 Fonctionnel</div><div class="score-bar"><div class="fill" data-w="20" style="background:linear-gradient(90deg,#f72585,#ff6b9d)"></div></div><div class="val">2/10</div></div>
+      <div class="score-row"><div class="name">⚡ Performance</div><div class="score-bar"><div class="fill" data-w="35" style="background:linear-gradient(90deg,#fbbf24,#f72585)"></div></div><div class="val">3.5/10</div></div>
+      <div class="score-row"><div class="name">🧪 Qualité &amp; Tests</div><div class="score-bar"><div class="fill" data-w="50" style="background:linear-gradient(90deg,#4cc9f0,#7b5cff)"></div></div><div class="val">5/10</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ROADMAP ===================== -->
+<section id="roadmap">
+  <div class="container">
+    <div class="reveal">
+      <div class="eyebrow">05 · Feuille de route</div>
+      <h2 class="sec-title">🗺️ Prochaines étapes recommandées</h2>
+    </div>
+    <div class="roadmap reveal-stagger">
+      <div class="rm-item done"><h4>Sprint 0 <span class="rm-tag">✅ fait</span></h4><p>Git, sécurité de base, déploiement Railway, PostgreSQL, correction du bug d'images.</p></div>
+      <div class="rm-item"><h4>Sprint 1</h4><p>Authentification réelle (inscription, connexion, déconnexion, reset mot de passe).</p></div>
+      <div class="rm-item"><h4>Sprint 2</h4><p>Panier et tunnel de commande fonctionnels.</p></div>
+      <div class="rm-item"><h4>Sprint 3</h4><p>Intégration de paiement réelle (Stripe + Mobile Money + COD).</p></div>
+      <div class="rm-item"><h4>Sprint 4</h4><p>Recherche et navigation par catégorie connectées à la base de données.</p></div>
+      <div class="rm-item"><h4>Sprint 5</h4><p>Stockage media persistant (S3 / Cloudflare R2) + optimisation des requêtes (index, pagination, retrait de <code>order_by('?')</code>).</p></div>
+      <div class="rm-item"><h4>Sprint 6</h4><p>Tests automatisés + pipeline CI/CD.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== VERDICT ===================== -->
+<section id="verdict">
+  <div class="container reveal">
+    <div class="eyebrow">06 · Conclusion</div>
+    <h2 class="sec-title">✍️ Verdict final</h2>
+    <blockquote>
+      "ZandoMarketPlace repose sur des fondations de données solides — mais reste aujourd'hui une vitrine, pas un marketplace. Un visiteur peut regarder des produits ; il ne peut ni créer de compte, ni acheter, ni payer. L'intervention de Cognito Inc. a rendu le projet sain, sécurisé et réellement déployé : la fondation est prête à recevoir les fonctionnalités métier qui transformeront cette vitrine en marketplace opérationnel."
+    </blockquote>
+    <div class="signature">
+      <div class="name">Jonathan Kakesa, CPI | CEO Cognito Inc.</div>
+      <div class="role">Senior Full-Stack Engineer · Audit technique indépendant</div>
+    </div>
+  </div>
+</section>
+
+<footer>© 2026 Cognito Inc. — Rapport d'audit technique ZandoMarketPlace</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+<script>
+/* ===== Scroll reveal ===== */
+const revealEls = document.querySelectorAll('.reveal, .reveal-stagger');
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.15 });
+revealEls.forEach(el => io.observe(el));
+
+/* ===== Meter bars (app cards) ===== */
+const meterIO = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.querySelectorAll('[data-w]').forEach(s => s.style.width = s.dataset.w + '%');
+    }
+  });
+}, { threshold: 0.3 });
+document.querySelectorAll('#app-cards, #scores').forEach(el => meterIO.observe(el));
+
+/* ===== Animated counters ===== */
+document.querySelectorAll('[data-count]').forEach(el => {
+  const target = parseInt(el.dataset.count, 10);
+  let started = false;
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting && !started) {
+        started = true;
+        let cur = 0;
+        const step = Math.max(1, Math.ceil(target/40));
+        const t = setInterval(() => {
+          cur += step;
+          if (cur >= target) { cur = target; clearInterval(t); }
+          el.textContent = cur;
+        }, 30);
+      }
+    });
+  }, { threshold: 0.5 });
+  obs.observe(el);
+});
+
+/* ===== Typing effect (hero) ===== */
+const phrases = [
+  "$ python manage.py audit --deep --client-report",
+  "> 23 tables analysées · 27 relations cartographiées",
+  "> 29 failles détectées · 0% à 65% production-ready",
+];
+let pIdx = 0, cIdx = 0, typedEl = document.getElementById('typed');
+function typeLoop(){
+  if (cIdx <= phrases[pIdx].length) {
+    typedEl.textContent = phrases[pIdx].slice(0, cIdx) + '▌';
+    cIdx++;
+    setTimeout(typeLoop, 32);
+  } else {
+    setTimeout(() => { cIdx = 0; pIdx = (pIdx+1) % phrases.length; typeLoop(); }, 1600);
+  }
+}
+typeLoop();
+
+/* ===== Tabs (audit) ===== */
+document.querySelectorAll('#tabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ===== Tabs (base de données : 3D vs MCD) ===== */
+document.querySelectorAll('#db-tabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#db-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.db-tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('dbtab-' + btn.dataset.dbtab).classList.add('active');
+  });
+});
+
+/* ===== Nav active link on scroll ===== */
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('#nav-links a');
+const navIO = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#'+e.target.id));
+    }
+  });
+}, { threshold: 0.4 });
+sections.forEach(s => navIO.observe(s));
+
+/* ===== Subtle starfield background canvas ===== */
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+function resize(){ canvas.width = window.innerWidth; canvas.height = document.body.scrollHeight; }
+resize();
+window.addEventListener('resize', resize);
+const stars = Array.from({length:140}, () => ({
+  x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+  r: Math.random()*1.6+0.3, s: Math.random()*0.4+0.1, phase: Math.random()*Math.PI*2
+}));
+function drawStars(t){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  stars.forEach(st => {
+    const alpha = 0.25 + Math.sin(t*0.001*st.s*4 + st.phase)*0.25;
+    ctx.beginPath();
+    ctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(180,190,255,${Math.max(0,alpha)})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(drawStars);
+}
+requestAnimationFrame(drawStars);
+</script>
+</body>
+</html>
